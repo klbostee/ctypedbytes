@@ -184,6 +184,16 @@ _fastb_write_pyobj_long(FILE *stream, PyObject *pyobj, PyObject *fallback) {
 }
 
 static PyObject *
+_fastb_read_pyobj_string(FILE *stream) {
+  PyObject *string;
+  char *buf;
+  buf = _fastb_read_string(stream);
+  string = PyString_FromString(buf);
+  PyMem_FREE(buf);
+  return string;
+}
+
+static PyObject *
 _fastb_read_pyobj_tuple(FILE *stream, PyObject *fallback) {
   PyObject *tuple;
   Py_ssize_t i, size;
@@ -271,7 +281,7 @@ _fastb_read_pyobj(FILE *stream, PyObject *fallback) {
   } else if (typecode == LONG_TC) {
     return PyLong_FromLongLong(_fastb_read_long(stream));
   } else if (typecode == STRING_TC) {
-    return PyString_FromString(_fastb_read_string(stream));
+    return _fastb_read_pyobj_string(stream);
   } else if (typecode == VECTOR_TC) {
     return _fastb_read_pyobj_tuple(stream, fallback);
   } else if (typecode == LIST_TC) {
