@@ -9,14 +9,14 @@
 #define MAP_TC    10
 #define MARKER_TC 255
 
-static int
+static inline int
 _fastb_read_bool(FILE *stream) {
   unsigned char c;
   fread(&c, sizeof(unsigned char), 1, stream);
   return (int) c;
 }
 
-static int 
+static inline int 
 _fastb_write_bool(FILE *stream, int b) {
   unsigned char c[2];
   c[0] = BOOL_TC; /* typecode */
@@ -24,7 +24,7 @@ _fastb_write_bool(FILE *stream, int b) {
   return fwrite(&c, sizeof(unsigned char), 2, stream) == 2;
 }
 
-static long
+static inline long
 _fastb_read_int(FILE *stream) {
   unsigned char c[4];
   fread(&c, sizeof(unsigned char), 4, stream);
@@ -32,7 +32,7 @@ _fastb_read_int(FILE *stream) {
          ((c[2] & 255) <<  8) + ((c[3] & 255)      );
 }
 
-static int 
+static inline int 
 _fastb_write_int(FILE *stream, long i) {
   unsigned char c[5];
   c[0] = INT_TC; /* typecode */
@@ -43,7 +43,7 @@ _fastb_write_int(FILE *stream, long i) {
   return fwrite(&c, sizeof(unsigned char), 5, stream) == 5;
 }
 
-static long long
+static inline long long
 _fastb_read_long(FILE *stream) {
   unsigned char c[8];
   fread(&c, sizeof(unsigned char), 8, stream);
@@ -55,7 +55,7 @@ _fastb_read_long(FILE *stream) {
          ((c[6] & 255) <<  8) + ((c[7] & 255)      );
 }
 
-static int 
+static inline int 
 _fastb_write_long(FILE *stream, long long l) {
   unsigned char c[9];
   c[0] = LONG_TC; /* typecode */
@@ -70,23 +70,15 @@ _fastb_write_long(FILE *stream, long long l) {
   return fwrite(&c, sizeof(unsigned char), 9, stream) == 9;
 }
 
-static char *
-_fastb_read_string(FILE *stream) {
-  unsigned char c[4];
-  char *s;
-  int len;
-  fread(&c, sizeof(unsigned char), 4, stream);
-  len = ((c[0] & 255) << 24) + ((c[1] & 255) << 16) +
-        ((c[2] & 255) <<  8) + ((c[3] & 255)      );
-  s = (char *) PyMem_MALLOC((len + 1) * sizeof(char));
-  if (s == NULL)
-     return NULL;
-  fread(s, sizeof(char), len, stream);
-  s[len] = 0;
-  return s;
+static inline int
+_fastb_read_string(FILE *stream, char *s, int len) {
+  if (fread(s, sizeof(char), len, stream) != len)
+    return 0;
+  s[len] = '\0';
+  return 1;
 }
 
-static int
+static inline int
 _fastb_write_string(FILE *stream, char *s) {
   unsigned char c[5];
   int len;
@@ -101,7 +93,7 @@ _fastb_write_string(FILE *stream, char *s) {
   return fwrite(s, sizeof(char), len, stream) == len;
 }
 
-static int 
+static inline int 
 _fastb_write_vector_header(FILE *stream, int size) {
   unsigned char c[5];
   c[0] = VECTOR_TC; /* typecode */
@@ -112,21 +104,21 @@ _fastb_write_vector_header(FILE *stream, int size) {
   return fwrite(&c, sizeof(unsigned char), 5, stream) == 5;
 }
 
-static int 
+static inline int 
 _fastb_write_list_header(FILE *stream) {
   unsigned char c;
   c = LIST_TC; /* typecode */
   return fwrite(&c, sizeof(unsigned char), 1, stream) == 1;
 }
 
-static int
+static inline int
 _fastb_write_list_footer(FILE *stream) {
   unsigned char c;
   c = MARKER_TC; /* typecode */
   return fwrite(&c, sizeof(unsigned char), 1, stream) == 1;  
 }
 
-static int
+static inline int
 _fastb_write_map_header(FILE *stream, int size) {
   unsigned char c[5];
   c[0] = MAP_TC; /* typecode */
@@ -163,14 +155,34 @@ _fastb_write_pyobj_fallback(FILE *stream, PyObject *pyobj, PyObject *fallback) {
   return 1;
 }
 
+static PyObject *
+_fastb_read_pyobj_bool(FILE *stream, PyObject *fallback) {
+  return PyBool_FromLong(_fastb_read_bool(stream));
+}
+
+static int
+_fastb_write_pyobj_bool(FILE *stream, PyObject *pyobj, PyObject *fallback) {
+  return _fastb_write_bool(stream, (unsigned char) PyInt_AS_LONG(pyobj));
+}
+
+static PyObject *
+_fastb_read_pyobj_int(FILE *stream, PyObject *fallback) {
+  return PyInt_FromLong(_fastb_read_int(stream));
+}
+
 static int 
-_fastb_write_pyobj_int(FILE *stream, PyObject *pyobj) {
+_fastb_write_pyobj_int(FILE *stream, PyObject *pyobj, PyObject *fallback) {
   long l = PyInt_AS_LONG(pyobj);
   if (-2147483647L <= l && l <= 2147483647L) {
     return _fastb_write_int(stream, l);
   } else {
     return _fastb_write_long(stream, l);
   }
+}
+
+static PyObject *
+_fastb_read_pyobj_long(FILE *stream, PyObject *fallback) {
+  return PyLong_FromLongLong(_fastb_read_long(stream));
 }
 
 static int
@@ -184,13 +196,19 @@ _fastb_write_pyobj_long(FILE *stream, PyObject *pyobj, PyObject *fallback) {
 }
 
 static PyObject *
-_fastb_read_pyobj_string(FILE *stream) {
-  PyObject *string;
-  char *buf;
-  buf = _fastb_read_string(stream);
-  string = PyString_FromString(buf);
-  PyMem_FREE(buf);
-  return string;
+_fastb_read_pyobj_string(FILE *stream, PyObject *fallback) {
+  PyStringObject *string;
+  Py_ssize_t len;
+  len = _fastb_read_int(stream);
+  string = (PyStringObject *) PyString_FromStringAndSize(NULL, len);
+  if (!_fastb_read_string(stream, string->ob_sval, len))
+    return NULL;
+  return (PyObject *) string;
+}
+
+static int 
+_fastb_write_pyobj_string(FILE *stream, PyObject *pyobj, PyObject *fallback) {
+  return _fastb_write_string(stream, PyString_AS_STRING(pyobj));
 }
 
 static PyObject *
@@ -269,42 +287,48 @@ _fastb_write_pyobj_dict(FILE *stream, PyObject *pyobj, PyObject *fallback) {
   return 1;
 }
 
+typedef PyObject * (*_fastb_read_cb) (FILE *, PyObject *);
+
+static _fastb_read_cb _read_cb_table[256];
+
+static void
+_fastb_init_read_cb_table(void) {
+  int i;
+  for (i = 0; i < 256; i++) {
+    _read_cb_table[i] = _fastb_read_pyobj_fallback;
+  }
+  _read_cb_table[BOOL_TC] = _fastb_read_pyobj_bool;
+  _read_cb_table[INT_TC] = _fastb_read_pyobj_int;
+  _read_cb_table[LONG_TC] = _fastb_read_pyobj_long;
+  _read_cb_table[STRING_TC] = _fastb_read_pyobj_string;
+  _read_cb_table[VECTOR_TC] = _fastb_read_pyobj_tuple;
+  _read_cb_table[LIST_TC] = _fastb_read_pyobj_list;
+  _read_cb_table[MAP_TC] = _fastb_read_pyobj_dict;
+  _read_cb_table[MARKER_TC] = NULL;
+}
+
 static PyObject *
 _fastb_read_pyobj(FILE *stream, PyObject *fallback) {
   unsigned char typecode;
+  _fastb_read_cb callback;
   if (!fread(&typecode, sizeof(char), 1, stream))
     return NULL;
-  if (typecode == BOOL_TC) {
-    return PyBool_FromLong(_fastb_read_bool(stream));
-  } else if (typecode == INT_TC) {
-    return PyInt_FromLong(_fastb_read_int(stream));
-  } else if (typecode == LONG_TC) {
-    return PyLong_FromLongLong(_fastb_read_long(stream));
-  } else if (typecode == STRING_TC) {
-    return _fastb_read_pyobj_string(stream);
-  } else if (typecode == VECTOR_TC) {
-    return _fastb_read_pyobj_tuple(stream, fallback);
-  } else if (typecode == LIST_TC) {
-    return _fastb_read_pyobj_list(stream, fallback);
-  } else if (typecode == MAP_TC) {
-    return _fastb_read_pyobj_dict(stream, fallback);
-  } else if (typecode == MARKER_TC) {
+  callback = _read_cb_table[typecode];
+  if (callback == NULL)
     return NULL;
-  } else {
-    return _fastb_read_pyobj_fallback(stream, fallback);
-  }
+  return callback(stream, fallback);
 }
 
 static int
 _fastb_write_pyobj(FILE *stream, PyObject *pyobj, PyObject *fallback) {
   if (PyBool_Check(pyobj)) {
-    return _fastb_write_bool(stream, (unsigned char) PyInt_AS_LONG(pyobj));
+    return _fastb_write_pyobj_bool(stream, pyobj, fallback);
   } else if (PyInt_CheckExact(pyobj)) {   
-    return _fastb_write_pyobj_int(stream, pyobj);
+    return _fastb_write_pyobj_int(stream, pyobj, fallback);
   } else if (PyLong_CheckExact(pyobj)) {
     return _fastb_write_pyobj_long(stream, pyobj, fallback);  
   } else if (PyString_CheckExact(pyobj)) {
-    return _fastb_write_string(stream, PyString_AS_STRING(pyobj));
+    return _fastb_write_pyobj_string(stream, pyobj, fallback);
   } else if (PyTuple_CheckExact(pyobj)) {
     return _fastb_write_pyobj_tuple(stream, pyobj, fallback);
   } else if (PyList_CheckExact(pyobj)) {
@@ -444,7 +468,7 @@ writes(PyObject *self, PyObject *args)
 }
 
 
-static PyMethodDef CtbMethods[] = {
+static PyMethodDef FastbMethods[] = {
   {"reads", reads, METH_VARARGS,
    "Read python objects."},
   {"writes", writes, METH_VARARGS,      
@@ -454,5 +478,6 @@ static PyMethodDef CtbMethods[] = {
 
 PyMODINIT_FUNC
 initfastb(void) {
-  Py_InitModule("fastb", CtbMethods);
+  Py_InitModule("fastb", FastbMethods);
+  _fastb_init_read_cb_table();
 }
