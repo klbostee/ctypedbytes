@@ -18,6 +18,7 @@
 
 #include <Python.h>
 
+#define BYTE_TC   1
 #define BOOL_TC   2
 #define INT_TC    3
 #define LONG_TC   4
@@ -28,10 +29,15 @@
 #define MARKER_TC 255
 
 static inline int
-_fastb_read_bool(FILE *stream) {
+_fastb_read_byte(FILE *stream) {
   unsigned char c;
   fread(&c, sizeof(unsigned char), 1, stream);
   return (int) c;
+}
+
+static inline int
+_fastb_read_bool(FILE *stream) {
+  return _fastb_read_byte(stream);
 }
 
 static inline int 
@@ -186,6 +192,11 @@ _fastb_write_pyobj_fallback(FILE *stream, PyObject *pyobj, PyObject *fallback) {
 }
 
 static PyObject *
+_fastb_read_pyobj_byte(FILE *stream, PyObject *fallback) {
+  return PyInt_FromLong(_fastb_read_byte(stream));
+}
+
+static PyObject *
 _fastb_read_pyobj_bool(FILE *stream, PyObject *fallback) {
   return PyBool_FromLong(_fastb_read_bool(stream));
 }
@@ -327,6 +338,7 @@ _fastb_init_read_cb_table(void) {
   for (i = 0; i < 256; i++) {
     _read_cb_table[i] = NULL;
   }
+  _read_cb_table[BYTE_TC] = _fastb_read_pyobj_byte;
   _read_cb_table[BOOL_TC] = _fastb_read_pyobj_bool;
   _read_cb_table[INT_TC] = _fastb_read_pyobj_int;
   _read_cb_table[LONG_TC] = _fastb_read_pyobj_long;
