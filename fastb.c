@@ -155,9 +155,9 @@ static int
 _fastb_write_pyobj(FILE *stream, PyObject *pyobj, PyObject *fallback);
 
 static PyObject *
-_fastb_read_pyobj_fallback(FILE *stream, long typecode, PyObject *fallback) {
+_fastb_read_pyobj_fallback(FILE *stream, int typecode, PyObject *fallback) {
   PyObject *args, *handler, *ret;
-  args = Py_BuildValue("(N)", PyInt_FromLong(typecode));
+  args = Py_BuildValue("(i)", typecode);
   handler = PyEval_CallObject(fallback, args);
   Py_DECREF(args);
   args = PyTuple_Pack(0);
@@ -169,17 +169,19 @@ _fastb_read_pyobj_fallback(FILE *stream, long typecode, PyObject *fallback) {
 
 static int
 _fastb_write_pyobj_fallback(FILE *stream, PyObject *pyobj, PyObject *fallback) {
-  PyObject *args, *handler, *ret;
-  args = Py_BuildValue("(N)", PyObject_Type(pyobj));
+  PyObject *type, *args, *handler, *ret;
+  type = PyObject_Type(pyobj);
+  args = PyTuple_Pack(1, type);
   handler = PyEval_CallObject(fallback, args);
   Py_DECREF(args);
+  Py_DECREF(type);
   args = PyTuple_Pack(1, pyobj);
   ret = PyEval_CallObject(handler, args);
+  Py_DECREF(args);
+  Py_DECREF(handler);
   if (ret == NULL)
     return 0;
   Py_DECREF(ret);
-  Py_DECREF(args);
-  Py_DECREF(handler);
   return 1;
 }
 
