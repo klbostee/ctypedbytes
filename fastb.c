@@ -254,12 +254,14 @@ _fastb_write_pyobj_string(FILE *stream, PyObject *pyobj, PyObject *fallback) {
 
 static PyObject *
 _fastb_read_pyobj_tuple(FILE *stream, PyObject *fallback) {
-  PyObject *tuple;
+  PyObject *tuple, *item;
   Py_ssize_t i, size;
   size = _fastb_read_int(stream);
   tuple = PyTuple_New(size);
   for (i = 0; i < size; i++) {
-    PyTuple_SET_ITEM(tuple, i, _fastb_read_pyobj(stream, fallback));
+    item = _fastb_read_pyobj(stream, fallback);
+    PyTuple_SET_ITEM(tuple, i, item);
+    Py_DECREF(item);
   }
   return tuple;
 }
@@ -282,6 +284,7 @@ _fastb_read_pyobj_list(FILE *stream, PyObject *fallback) {
   list = PyList_New(0);
   while ((item = _fastb_read_pyobj(stream, fallback))) {
     PyList_Append(list, item);
+    Py_DECREF(item);
   }
   return list;
 }
@@ -310,6 +313,8 @@ _fastb_read_pyobj_dict(FILE *stream, PyObject *fallback) {
     key = _fastb_read_pyobj(stream, fallback);
     value = _fastb_read_pyobj(stream, fallback);
     PyDict_SetItem(dict, key, value);
+    Py_DECREF(key);
+    Py_DECREF(value);
   }
   return dict;
 }
