@@ -30,19 +30,19 @@ def classes():
     class Input(typedbytes.Input):
 
         def reads(self):
-            return reads(self.file, self._read)
+            return reads(self.file, self.lookup)
 
 
     class Output(typedbytes.Output):
 
         def writes(self, iterable):
-            writes(self.file, iterable, self._write)
+            writes(self.file, iterable, self.lookup)
 
     
     class PairedInput(typedbytes.PairedInput):
 
         def reads(self):
-            next = reads(self.file, self._read).next
+            next = reads(self.file, self.lookup).next
             while True:
                 key = next()
                 try:
@@ -55,7 +55,7 @@ def classes():
     class PairedOutput(typedbytes.PairedOutput):
  
         def writes(self, iterable):
-            writes(self.file, flatten(iterable), self._write)
+            writes(self.file, flatten(iterable), self.lookup)
 
 
     return Input, Output, PairedInput, PairedOutput

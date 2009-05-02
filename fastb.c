@@ -155,20 +155,25 @@ static int
 _fastb_write_pyobj(FILE *stream, PyObject *pyobj, PyObject *fallback);
 
 static PyObject *
-_fastb_read_pyobj_fallback(FILE *stream, PyObject *fallback) {
-  PyObject *args, *ret;
-  fseek(stream, -1, SEEK_CUR);
+_fastb_read_pyobj_fallback(FILE *stream, long typecode, PyObject *fallback) {
+  PyObject *args, *handler, *ret;
+  args = Py_BuildValue("(N)", PyInt_FromLong(typecode));
+  handler = PyEval_CallObject(fallback, args);
+  Py_DECREF(args);
   args = PyTuple_Pack(0);
-  ret = PyEval_CallObject(fallback, args);
+  ret = PyEval_CallObject(handler, args);
   Py_DECREF(args);
   return ret;
 }
 
 static int
 _fastb_write_pyobj_fallback(FILE *stream, PyObject *pyobj, PyObject *fallback) {
-  PyObject *args;
+  PyObject *args, *handler;
+  args = Py_BuildValue("(N)", PyObject_Type(pyobj));
+  handler = PyEval_CallObject(fallback, args);
+  Py_DECREF(args);
   args = PyTuple_Pack(1, pyobj);
-  PyEval_CallObject(fallback, args);
+  PyEval_CallObject(handler, args);
   Py_DECREF(args);
   return 1;
 }
@@ -313,7 +318,7 @@ static void
 _fastb_init_read_cb_table(void) {
   int i;
   for (i = 0; i < 256; i++) {
-    _read_cb_table[i] = _fastb_read_pyobj_fallback;
+    _read_cb_table[i] = NULL;
   }
   _read_cb_table[BOOL_TC] = _fastb_read_pyobj_bool;
   _read_cb_table[INT_TC] = _fastb_read_pyobj_int;
@@ -322,18 +327,19 @@ _fastb_init_read_cb_table(void) {
   _read_cb_table[VECTOR_TC] = _fastb_read_pyobj_tuple;
   _read_cb_table[LIST_TC] = _fastb_read_pyobj_list;
   _read_cb_table[MAP_TC] = _fastb_read_pyobj_dict;
-  _read_cb_table[MARKER_TC] = NULL;
 }
 
 static PyObject *
 _fastb_read_pyobj(FILE *stream, PyObject *fallback) {
   unsigned char typecode;
   _fastb_read_cb callback;
-  if (!fread(&typecode, sizeof(char), 1, stream))
+  if (!fread(&typecode, sizeof(unsigned char), 1, stream))
+    return NULL;
+  if (typecode == MARKER_TC)
     return NULL;
   callback = _read_cb_table[typecode];
   if (callback == NULL)
-    return NULL;
+    return _fastb_read_pyobj_fallback(stream, typecode, fallback);
   return callback(stream, fallback);
 }
 
@@ -405,7 +411,7 @@ readiter_iternext(readiterobject *rio)
 static PyTypeObject readitertype = {
   PyObject_HEAD_INIT(&PyType_Type)
   0,
-  "fastb.readiter",                          /* tp_name */
+  "fastb.readiter",                        /* tp_name */
   sizeof(readiterobject),                  /* tp_basicsize */
   0,                                       /* tp_itemsize */
   (destructor)readiter_dealloc,            /* tp_dealloc */
