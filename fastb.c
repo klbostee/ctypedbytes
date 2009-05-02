@@ -254,14 +254,12 @@ _fastb_write_pyobj_string(FILE *stream, PyObject *pyobj, PyObject *fallback) {
 
 static PyObject *
 _fastb_read_pyobj_tuple(FILE *stream, PyObject *fallback) {
-  PyObject *tuple, *item;
+  PyObject *tuple;
   Py_ssize_t i, size;
   size = _fastb_read_int(stream);
   tuple = PyTuple_New(size);
   for (i = 0; i < size; i++) {
-    item = _fastb_read_pyobj(stream, fallback);
-    PyTuple_SET_ITEM(tuple, i, item);
-    Py_DECREF(item);
+    PyTuple_SET_ITEM(tuple, i, _fastb_read_pyobj(stream, fallback));
   }
   return tuple;
 }
