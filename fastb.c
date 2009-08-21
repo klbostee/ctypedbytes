@@ -75,8 +75,10 @@ _fastb_read_long(FILE *stream) {
          (((long long) c[1] & 255) << 48) +
          (((long long) c[2] & 255) << 40) + 
          (((long long) c[3] & 255) << 32) +
-         ((c[4] & 255) << 24) + ((c[5] & 255) << 16) +
-         ((c[6] & 255) <<  8) + ((c[7] & 255)      );
+         (((long long) c[4] & 255) << 24) +
+         (((long long) c[5] & 255) << 16) +
+         (((long long) c[6] & 255) <<  8) +
+         (((long long) c[7] & 255)      );
 }
 
 static inline int 

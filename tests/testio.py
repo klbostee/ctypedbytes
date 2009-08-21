@@ -19,7 +19,7 @@ class TestIO(unittest.TestCase):
         file.close()
         file = open("test.bin", "rb")
         input = typedbytes.Input(file)
-        for (index, record) in enumerate(input):
+        for (index, record) in enumerate(input.reads()):
             self.assertEqual(objects[index], record)
         file.close()
         os.remove("test.bin")
@@ -32,7 +32,7 @@ class TestIO(unittest.TestCase):
         file.close()
         file = open("test.bin", "rb")
         input = typedbytes.PairedInput(file)
-        for index, record in input:
+        for index, record in input.reads():
             self.assertEqual(objects[index], record)
         file.close()
         os.remove("test.bin")
