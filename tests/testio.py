@@ -8,7 +8,7 @@ import ctypedbytes as typedbytes
 class TestIO(unittest.TestCase):
 
     objects = [True, 1234, 3000000000, 12345L, 1.23, "trala", u'trala',
-                (1,2,3), [1,2,3,4], {1:2,3:4}, set([1,2,3]),
+                'tra\0la', (1,2,3), [1,2,3,4], {1:2,3:4}, set([1,2,3]),
                 decimal.Decimal("123.456"), datetime.datetime.now()]
 
     def testio(self):

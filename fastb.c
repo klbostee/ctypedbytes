@@ -105,10 +105,8 @@ _fastb_read_string(FILE *stream, char *s, int len) {
 }
 
 static inline int
-_fastb_write_string(FILE *stream, char *s) {
+_fastb_write_string(FILE *stream, char *s, int len) {
   unsigned char c[5];
-  int len;
-  len = strlen(s);
   c[0] = STRING_TC; /* typecode */
   c[1] = (len >> 24) & 255;
   c[2] = (len >> 16) & 255;
@@ -251,7 +249,8 @@ _fastb_read_pyobj_string(FILE *stream, PyObject *fallback) {
 
 static int 
 _fastb_write_pyobj_string(FILE *stream, PyObject *pyobj, PyObject *fallback) {
-  return _fastb_write_string(stream, PyString_AS_STRING(pyobj));
+  return _fastb_write_string(stream, PyString_AS_STRING(pyobj),
+                             PyString_GET_SIZE(pyobj));
 }
 
 static PyObject *
