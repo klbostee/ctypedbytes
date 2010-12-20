@@ -24,6 +24,7 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 
+#define BYTES_TC  0
 #define BYTE_TC   1
 #define BOOL_TC   2
 #define INT_TC    3
@@ -100,6 +101,27 @@ _fastb_write_long(FILE *stream, long long l) {
   c[7] = (l >>  8) & 255;
   c[8] = (l      ) & 255;
   return fwrite(&c, sizeof(unsigned char), 9, stream) == 9;
+}
+
+static inline int
+_fastb_read_bytes(FILE *stream, char *buf, int len) {
+  if (fread(buf, sizeof(char), len, stream) != len)
+    return 0;
+  buf[len] = '\0';
+  return 1;
+}
+
+static inline int
+_fastb_write_bytes(FILE *stream, char *buf, int len) {
+  unsigned char c[5];
+  c[0] = BYTES_TC; /* typecode */
+  c[1] = (len >> 24) & 255;
+  c[2] = (len >> 16) & 255;
+  c[3] = (len >>  8) & 255;
+  c[4] = (len      ) & 255;
+  if (fwrite(&c, sizeof(unsigned char), 5, stream) != 5)
+    return 0;
+  return fwrite(buf, sizeof(char), len, stream) == len;
 }
 
 static inline int
@@ -248,15 +270,45 @@ _fastb_read_pyobj_string(FILE *stream, PyObject *fallback) {
   Py_ssize_t len;
   len = _fastb_read_int(stream);
   string = (PyStringObject *) PyString_FromStringAndSize(NULL, len);
-  if (!_fastb_read_string(stream, string->ob_sval, len))
+  if (!_fastb_read_bytes(stream, string->ob_sval, len))
     return NULL;
   return (PyObject *) string;
 }
 
 static int 
 _fastb_write_pyobj_string(FILE *stream, PyObject *pyobj, PyObject *fallback) {
-  return _fastb_write_string(stream, PyString_AS_STRING(pyobj),
-                             PyString_GET_SIZE(pyobj));
+  return _fastb_write_bytes(stream, PyString_AS_STRING(pyobj),
+                            PyString_GET_SIZE(pyobj));
+}
+
+static PyObject *
+_fastb_read_pyobj_unicode(FILE *stream, PyObject *fallback) {
+  PyObject *object;
+  Py_ssize_t len;
+  len = _fastb_read_int(stream);
+  if (len < 1024) {
+    char stackbuf[1024];
+    if (!_fastb_read_string(stream, stackbuf, len))
+      return NULL;
+    object = (PyObject *) PyUnicode_DecodeUTF8(stackbuf, len, NULL);
+  } else {
+    char *buf;
+    buf = (char *) PyMem_Malloc(len + 1);
+    if (!_fastb_read_string(stream, buf, len))
+      return NULL;
+    object = (PyObject *) PyUnicode_DecodeUTF8(buf, len, "replace");
+    PyMem_Free(buf);
+  }
+  return object;
+}
+
+static int
+_fastb_write_pyobj_unicode(FILE *stream, PyObject *pyobj, PyObject *fallback) {
+  PyStringObject *string;
+  string = (PyStringObject *) PyUnicode_EncodeUTF8(PyUnicode_AS_UNICODE(pyobj),
+                                                   PyUnicode_GET_SIZE(pyobj), NULL);
+  return _fastb_write_string(stream, PyString_AS_STRING(string),
+                             PyString_GET_SIZE(string));
 }
 
 static PyObject *
@@ -348,11 +400,12 @@ _fastb_init_read_cb_table(void) {
   for (i = 0; i < 256; i++) {
     _read_cb_table[i] = NULL;
   }
+  _read_cb_table[BYTES_TC] = _fastb_read_pyobj_string;
   _read_cb_table[BYTE_TC] = _fastb_read_pyobj_byte;
   _read_cb_table[BOOL_TC] = _fastb_read_pyobj_bool;
   _read_cb_table[INT_TC] = _fastb_read_pyobj_int;
   _read_cb_table[LONG_TC] = _fastb_read_pyobj_long;
-  _read_cb_table[STRING_TC] = _fastb_read_pyobj_string;
+  _read_cb_table[STRING_TC] = _fastb_read_pyobj_unicode;
   _read_cb_table[VECTOR_TC] = _fastb_read_pyobj_tuple;
   _read_cb_table[LIST_TC] = _fastb_read_pyobj_list;
   _read_cb_table[MAP_TC] = _fastb_read_pyobj_dict;
@@ -379,9 +432,11 @@ _fastb_write_pyobj(FILE *stream, PyObject *pyobj, PyObject *fallback) {
   } else if (PyInt_CheckExact(pyobj)) {   
     return _fastb_write_pyobj_int(stream, pyobj, fallback);
   } else if (PyLong_CheckExact(pyobj)) {
-    return _fastb_write_pyobj_long(stream, pyobj, fallback);  
+    return _fastb_write_pyobj_long(stream, pyobj, fallback); 
   } else if (PyString_CheckExact(pyobj)) {
     return _fastb_write_pyobj_string(stream, pyobj, fallback);
+  } else if (PyUnicode_CheckExact(pyobj)) {
+    return _fastb_write_pyobj_unicode(stream, pyobj, fallback);
   } else if (PyTuple_CheckExact(pyobj)) {
     return _fastb_write_pyobj_tuple(stream, pyobj, fallback);
   } else if (PyList_CheckExact(pyobj)) {

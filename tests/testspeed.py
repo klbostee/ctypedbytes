@@ -14,7 +14,7 @@ class TestSpeed(unittest.TestCase):
         output = typedbytes.Output(file)
         t = time.time()
         output.writes(xrange(100000))
-        print time.time() - t
+        print "int reads:", time.time() - t
 
         file.close()
         file = open("speedtest.bin", "rb")
@@ -23,7 +23,7 @@ class TestSpeed(unittest.TestCase):
         t = time.time()
         for record in input:
             pass
-        print time.time() -t
+        print "int reads:", time.time() -t
 
         file.close()
         os.remove("speedtest.bin")
@@ -34,7 +34,7 @@ class TestSpeed(unittest.TestCase):
         output = typedbytes.Output(file)
         t = time.time()
         output.writes(imap(str, xrange(100000)))
-        print time.time() - t
+        print "string writes:", time.time() - t
 
         file.close()
         file = open("speedtest.bin", "rb")
@@ -43,7 +43,7 @@ class TestSpeed(unittest.TestCase):
         t = time.time()
         for record in input:
             pass
-        print time.time() -t
+        print "string reads:", time.time() -t
 
         file.close()
         os.remove("speedtest.bin")
@@ -54,7 +54,7 @@ class TestSpeed(unittest.TestCase):
         output = typedbytes.Output(file)
         t = time.time()
         output.writes(imap(unicode, xrange(100000)))
-        print time.time() - t
+        print "unicode writes:", time.time() - t
 
         file.close()
         file = open("speedtest.bin", "rb")
@@ -63,7 +63,7 @@ class TestSpeed(unittest.TestCase):
         t = time.time()
         for record in input:
             pass
-        print time.time() -t
+        print "unicode reads:", time.time() -t
 
         file.close()
         os.remove("speedtest.bin")
