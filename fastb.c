@@ -235,7 +235,10 @@ _fastb_read_pyobj_long(FILE *stream, PyObject *fallback) {
 static int
 _fastb_write_pyobj_long(FILE *stream, PyObject *pyobj, PyObject *fallback) {
   long long l = PyLong_AsLongLong(pyobj);
-  if (-9223372036854775807LL <= l && l <= 9223372036854775807LL) {
+  if (l == -1 && PyErr_Occurred()) {
+    PyErr_Clear();
+    return _fastb_write_pyobj_fallback(stream, pyobj, fallback);
+  } else if (-9223372036854775807LL <= l && l <= 9223372036854775807LL) {
     return _fastb_write_long(stream, l);
   } else {
     return _fastb_write_pyobj_fallback(stream, pyobj, fallback);
