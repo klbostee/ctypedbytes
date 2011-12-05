@@ -8,7 +8,7 @@ setup(name='ctypedbytes',
       url='http://github.com/klbostee/ctypedbytes',
       py_modules=['ctypedbytes'],
       ext_modules=[Extension('fastb', ['fastb.c'])],
-      install_requires = ['typedbytes>=0.3.6'],
+      install_requires = ['typedbytes>=0.3.7'],
       test_suite='nose.collector',
       tests_require=['nose']
      )

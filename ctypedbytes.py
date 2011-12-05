@@ -58,7 +58,7 @@ def classes():
             writes(self.file, flatten(iterable), self.lookup)
 
 
-    return Input, Output, PairedInput, PairedOutput
+    return Input, Output, PairedInput, PairedOutput, typedbytes.Bytes
  
 
-Input, Output, PairedInput, PairedOutput = classes()
+Input, Output, PairedInput, PairedOutput, Bytes = classes()
