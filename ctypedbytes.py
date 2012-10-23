@@ -19,6 +19,7 @@ def classes():
     import sys
     import typedbytes
     from fastb import reads, writes
+    from struct import error as StructError
 
     
     def flatten(iterable):

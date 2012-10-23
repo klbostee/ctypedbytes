@@ -3,7 +3,7 @@ import unittest
 import decimal
 import datetime
 import ctypedbytes as typedbytes
-
+from struct import error as StructError
 
 class TestIO(unittest.TestCase):
 
@@ -24,6 +24,20 @@ class TestIO(unittest.TestCase):
             self.assertEqual(objects[index], record)
         file.close()
         os.remove("test.bin")
+
+    def testwrongio(self):
+        try:
+            file = open("test.bin", "wb")
+            output = typedbytes.Output(file)
+            output.writes([1])
+            file.close()
+            file = open("test.bin", "rb")
+            input = typedbytes.Input(file)
+            input = typedbytes.PairedInput(file)
+            self.assertRaises(StructError, lambda :list(input.reads()))
+            file.close()
+        finally:
+            os.remove("test.bin")
 
     def testpairio(self):
         objects = TestIO.objects
