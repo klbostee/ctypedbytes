@@ -492,6 +492,8 @@ _fastb_write_pyiter(FILE *stream, PyObject *pyobj, PyObject *fallback) {
     Py_DECREF(item);
   }
   Py_DECREF(iterator);
+  if (PyErr_Occurred())
+    return 0;
   return 1;
 }
 
@@ -518,7 +520,8 @@ writes(PyObject *self, PyObject *args)
   stream = PyFile_AsFile(PyTuple_GET_ITEM(args, 0));
   pyobj = PyTuple_GET_ITEM(args, 1);
   fallback = PyTuple_GET_ITEM(args, 2);
-  _fastb_write_pyiter(stream, pyobj, fallback);
+  if (!_fastb_write_pyiter(stream, pyobj, fallback))
+      return NULL;
   Py_INCREF(Py_None);
   return Py_None;  
 }
