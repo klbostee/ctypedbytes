@@ -4,6 +4,7 @@ import decimal
 import datetime
 import ctypedbytes as typedbytes
 from struct import error as StructError
+import tempfile
 
 class TestIO(unittest.TestCase):
 
@@ -24,6 +25,18 @@ class TestIO(unittest.TestCase):
             self.assertEqual(objects[index], record)
         file.close()
         os.remove("test.bin")
+
+    def testoutputiterexception(self):
+        """output.writes() should raise exception if the passed
+        iterator raises exception."""
+        def outputgen():
+            raise Exception("error")
+            yield "something"
+
+        with tempfile.TemporaryFile() as f:
+            output = typedbytes.Output(f)
+            with self.assertRaises(Exception):
+                output.writes(outputgen())
 
     def testwrongio(self):
         try:
